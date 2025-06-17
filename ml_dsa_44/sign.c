@@ -6,7 +6,9 @@
 #include "randombytes.h"
 #include "sign.h"
 #include "symmetric.h"
+#include "memory_cleanse.h"
 #include <stdint.h>
+#include <string.h>
 
 /*************************************************
 * Name:        PQCLEAN_MLDSA44_CLEAN_crypto_sign_keypair
@@ -62,6 +64,90 @@ int PQCLEAN_MLDSA44_CLEAN_crypto_sign_keypair(uint8_t *pk, uint8_t *sk) {
     /* Compute H(rho, t1) and write secret key */
     shake256(tr, TRBYTES, pk, PQCLEAN_MLDSA44_CLEAN_CRYPTO_PUBLICKEYBYTES);
     PQCLEAN_MLDSA44_CLEAN_pack_sk(sk, rho, tr, key, &t0, &s1, &s2);
+
+    memory_cleanse(&s1, sizeof(s1));
+    memory_cleanse(&s1hat, sizeof(s1hat));
+    memory_cleanse(&s2, sizeof(s2));
+    memory_cleanse(&t0, sizeof(t0));
+    memory_cleanse(&t1, sizeof(t1));
+    memory_cleanse(mat, sizeof(mat));
+    memory_cleanse(tr, sizeof(tr));
+    memory_cleanse(seedbuf, sizeof(seedbuf));
+
+    return 0;
+}
+
+/*************************************************
+* Name:        PQCLEAN_MLDSA44_CLEAN_crypto_sign_keypair
+*
+* Description: Generates public and private key.
+*
+* Arguments:   - uint8_t *pk: pointer to output public key (allocated
+*                             array of PQCLEAN_MLDSA44_CLEAN_CRYPTO_PUBLICKEYBYTES bytes)
+*              - uint8_t *sk: pointer to output private key (allocated
+*                             array of PQCLEAN_MLDSA44_CLEAN_CRYPTO_SECRETKEYBYTES bytes)
+*              - const uint8_t *seed: Pointer to the input fixed seed.
+*                                     Must point to an array of SEEDBYTES bytes.
+*                                     The seed provides deterministic randomness
+*                                     for key generation and must be unique and
+*                                     securely generated for each keypair to
+*                                     ensure security.
+*
+* Returns 0 (success)
+**************************************************/
+int PQCLEAN_MLDSA44_CLEAN_crypto_sign_keypair_from_fseed(uint8_t *pk, uint8_t *sk, uint8_t *seed) {
+    uint8_t seedbuf[2 * SEEDBYTES + CRHBYTES];
+    uint8_t tr[TRBYTES];
+    const uint8_t *rho, *rhoprime, *key;
+    polyvecl mat[K];
+    polyvecl s1, s1hat;
+    polyveck s2, t1, t0;
+
+    /* Get randomness for rho, rhoprime and key */
+    memcpy(seedbuf, seed, SEEDBYTES);
+    seedbuf[SEEDBYTES + 0] = K;
+    seedbuf[SEEDBYTES + 1] = L;
+    shake256(seedbuf, 2 * SEEDBYTES + CRHBYTES, seedbuf, SEEDBYTES + 2);
+    rho = seedbuf;
+    rhoprime = rho + SEEDBYTES;
+    key = rhoprime + CRHBYTES;
+
+    /* Expand matrix */
+    PQCLEAN_MLDSA44_CLEAN_polyvec_matrix_expand(mat, rho);
+
+    /* Sample short vectors s1 and s2 */
+    PQCLEAN_MLDSA44_CLEAN_polyvecl_uniform_eta(&s1, rhoprime, 0);
+    PQCLEAN_MLDSA44_CLEAN_polyveck_uniform_eta(&s2, rhoprime, L);
+
+    /* Matrix-vector multiplication */
+    s1hat = s1;
+    PQCLEAN_MLDSA44_CLEAN_polyvecl_ntt(&s1hat);
+    PQCLEAN_MLDSA44_CLEAN_polyvec_matrix_pointwise_montgomery(&t1, mat, &s1hat);
+    PQCLEAN_MLDSA44_CLEAN_polyveck_reduce(&t1);
+    PQCLEAN_MLDSA44_CLEAN_polyveck_invntt_tomont(&t1);
+
+    /* Add error vector s2 */
+    PQCLEAN_MLDSA44_CLEAN_polyveck_add(&t1, &t1, &s2);
+
+    /* Extract t1 and write public key */
+    PQCLEAN_MLDSA44_CLEAN_polyveck_caddq(&t1);
+    PQCLEAN_MLDSA44_CLEAN_polyveck_power2round(&t1, &t0, &t1);
+    PQCLEAN_MLDSA44_CLEAN_pack_pk(pk, rho, &t1);
+
+    /* Compute H(rho, t1) and write secret key */
+    shake256(tr, TRBYTES, pk, PQCLEAN_MLDSA44_CLEAN_CRYPTO_PUBLICKEYBYTES);
+    PQCLEAN_MLDSA44_CLEAN_pack_sk(sk, rho, tr, key, &t0, &s1, &s2);
+
+
+    memory_cleanse(&s1, sizeof(s1));
+    memory_cleanse(&s1hat, sizeof(s1hat));
+    memory_cleanse(&s2, sizeof(s2));
+    memory_cleanse(&t0, sizeof(t0));
+    memory_cleanse(&t1, sizeof(t1));
+    memory_cleanse(mat, sizeof(mat));
+    memory_cleanse(tr, sizeof(tr));
+    memory_cleanse(seedbuf, sizeof(seedbuf));
+    memory_cleanse(seed, SEEDBYTES);
 
     return 0;
 }
@@ -191,6 +277,18 @@ rej:
     /* Write signature */
     PQCLEAN_MLDSA44_CLEAN_pack_sig(sig, sig, &z, &h);
     *siglen = PQCLEAN_MLDSA44_CLEAN_CRYPTO_BYTES;
+
+    memory_cleanse(&s1, sizeof(s1));
+    memory_cleanse(&s2, sizeof(s2));
+    memory_cleanse(&t0, sizeof(t0));
+    memory_cleanse(&y, sizeof(y));
+    memory_cleanse(&z, sizeof(z));
+    memory_cleanse(&w0, sizeof(w0));
+    memory_cleanse(&w1, sizeof(w1));
+    memory_cleanse(&cp, sizeof(cp));
+    memory_cleanse(&h, sizeof(h));
+    memory_cleanse(mat, sizeof(mat));
+    memory_cleanse(seedbuf, sizeof(seedbuf));
     return 0;
 }
 
@@ -321,6 +419,14 @@ int PQCLEAN_MLDSA44_CLEAN_crypto_sign_verify_ctx(const uint8_t *sig,
             return -1;
         }
     }
+
+    memory_cleanse(buf, sizeof(buf));
+    memory_cleanse(mu, sizeof(mu));
+    memory_cleanse(c2, sizeof(c2));
+    memory_cleanse(&cp, sizeof(cp));
+    memory_cleanse(&z, sizeof(z));
+    memory_cleanse(&w1, sizeof(w1));
+    memory_cleanse(mat, sizeof(mat));
 
     return 0;
 }
