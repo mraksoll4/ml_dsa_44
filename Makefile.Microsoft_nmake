@@ -1,0 +1,65 @@
+# This Makefile can be used with Microsoft Visual Studio's nmake using the command:
+#    nmake /f Makefile.Microsoft_nmake
+
+# Makefile.Microsoft_nmake
+# This Makefile can be used with Microsoft Visual Studio's nmake
+
+LIBRARY=libml-dsa-44_clean.lib
+BUILD_DIR=build
+LIB_PATH=$(BUILD_DIR)\$(LIBRARY)
+
+# Object files in build directory
+COMMON_OBJECTS=$(BUILD_DIR)\fips202.obj $(BUILD_DIR)\randombytes.obj $(BUILD_DIR)\memory_cleanse.obj
+MLDSA44_OBJECTS=$(BUILD_DIR)\ntt.obj $(BUILD_DIR)\packing.obj $(BUILD_DIR)\poly.obj $(BUILD_DIR)\polyvec.obj $(BUILD_DIR)\reduce.obj $(BUILD_DIR)\rounding.obj $(BUILD_DIR)\sign.obj $(BUILD_DIR)\symmetric-shake.obj
+OBJECTS=$(COMMON_OBJECTS) $(MLDSA44_OBJECTS)
+
+CFLAGS=/nologo /O2 /W4 /WX /wd4146 /Isrc\common /Isrc\mldsa44
+
+all: $(BUILD_DIR) $(LIB_PATH)
+
+$(BUILD_DIR):
+    if not exist $(BUILD_DIR) mkdir $(BUILD_DIR)
+
+# Explicit rules for common objects
+$(BUILD_DIR)\fips202.obj: src\common\fips202.c
+    $(CC) $(CFLAGS) /c /Fo$@ src\common\fips202.c
+
+$(BUILD_DIR)\randombytes.obj: src\common\randombytes.c
+    $(CC) $(CFLAGS) /c /Fo$@ src\common\randombytes.c
+
+$(BUILD_DIR)\memory_cleanse.obj: src\common\memory_cleanse.c
+    $(CC) $(CFLAGS) /c /Fo$@ src\common\memory_cleanse.c
+
+# Explicit rules for mldsa44 objects
+$(BUILD_DIR)\ntt.obj: src\mldsa44\ntt.c
+    $(CC) $(CFLAGS) /c /Fo$@ src\mldsa44\ntt.c
+
+$(BUILD_DIR)\packing.obj: src\mldsa44\packing.c
+    $(CC) $(CFLAGS) /c /Fo$@ src\mldsa44\packing.c
+
+$(BUILD_DIR)\poly.obj: src\mldsa44\poly.c
+    $(CC) $(CFLAGS) /c /Fo$@ src\mldsa44\poly.c
+
+$(BUILD_DIR)\polyvec.obj: src\mldsa44\polyvec.c
+    $(CC) $(CFLAGS) /c /Fo$@ src\mldsa44\polyvec.c
+
+$(BUILD_DIR)\reduce.obj: src\mldsa44\reduce.c
+    $(CC) $(CFLAGS) /c /Fo$@ src\mldsa44\reduce.c
+
+$(BUILD_DIR)\rounding.obj: src\mldsa44\rounding.c
+    $(CC) $(CFLAGS) /c /Fo$@ src\mldsa44\rounding.c
+
+$(BUILD_DIR)\sign.obj: src\mldsa44\sign.c
+    $(CC) $(CFLAGS) /c /Fo$@ src\mldsa44\sign.c
+
+$(BUILD_DIR)\symmetric-shake.obj: src\mldsa44\symmetric-shake.c
+    $(CC) $(CFLAGS) /c /Fo$@ src\mldsa44\symmetric-shake.c
+
+# Make sure objects are recompiled if headers change
+$(OBJECTS): src\common\*.h src\mldsa44\*.h
+
+$(LIB_PATH): $(OBJECTS)
+    LIB.EXE /NOLOGO /WX /OUT:$@ $(OBJECTS)
+
+clean:
+    if exist $(BUILD_DIR) rmdir /s /q $(BUILD_DIR)
